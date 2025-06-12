@@ -1,0 +1,78 @@
+import numpy as np
+import sympy as sp
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+# Метод прогонки
+def thomas(a, b, c, d):
+    n = len(d)
+    cp, dp = np.zeros(n-1), np.zeros(n)
+    cp[0] = c[0]/b[0]
+    dp[0] = d[0]/b[0]
+    for i in range(1, n-1):
+        m = 1.0/(b[i] - a[i-1]*cp[i-1])
+        cp[i] = c[i]*m
+        dp[i] = (d[i] - a[i-1]*dp[i-1])*m
+    dp[-1] = (d[-1] - a[-1]*dp[-2])/(b[-1] - a[-1]*cp[-1])
+    for i in range(n-2, -1, -1):
+        dp[i] -= cp[i]*dp[i+1]
+    return dp
+
+# Параметры задачи
+L = 1.0           # Длина стержня
+T = 1.0           # Общее время
+alpha = 1.0       # Коэффициент перед второй производной
+
+# Параметры сетки
+Nx = np.array([11,51,101])          # Количество узлов по пространству
+Nt = (Nx-1)**2*2         # Количество шагов по времени (т.к 1/nx[i] = h, а tau = h**2/2*alpha)
+# Функция расчета явной схемы
+def explicit_scheme(Nx, Nt,silent=False):
+    h = L / (Nx - 1)
+    tau = T/Nt
+    x = np.linspace(0, L, Nx) # Узлы сетки по X
+    t = np.linspace(0, T, Nt)
+    print(f"<Явная> H: {h},\tTau: {tau}\nУсловие сходимости явной схемы {'выполняется' if h**2/2>=tau else 'не выполняется!'}")
+    U = np.zeros((Nt, Nx)) # Массив значений температуры во времени и пространстве (i - время, j - иксы)
+    # Начальное условие в момент времени t = 0
+    U[0,:] = x+1
+    # Краевые условия для t = 0
+    U[0,0] = 1
+    U[0,-1] = 2
+    # Проходим по всем слоям (моментам времени)
+    for k in range(Nt-1):
+        # Записываем краевые условия в текущий момент времени
+        gamma = (alpha*tau)/h**2
+        for i in range(1,Nx-1):
+            # Через канонический вид
+            U[k+1,i]=gamma*U[k,i-1]+(1-2*gamma)*U[k,i]+gamma*U[k,i+1]+tau*(x[i]*(k*tau+1))
+        U[k+1,0] = 1
+        U[k+1,-1] = 2+(k*tau+tau)**2
+    if not silent:
+        plt.figure(figsize=(10, 6))
+        plt.imshow(U, aspect='auto', extent=[0, L, 0, T], origin='lower', cmap='hot')
+        plt.colorbar(label='Температура U(x, t)')
+        plt.ylabel('Время t')
+        plt.xlabel('Координата x')
+        plt.title('Распределение температуры U(x, t)')
+        plt.minorticks_on()
+        plt.grid(which='major')
+        plt.grid(which='minor', linestyle=':')
+        plt.show()
+
+        X, T_mesh = np.meshgrid(t, x)
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(X, T_mesh, U.T, cmap='viridis')
+        ax.set_xlabel('Координата x')
+        ax.set_ylabel('Время t')
+        ax.set_zlabel('Температура U(x, t)')
+        ax.set_title('Решение уравнения теплопроводности')
+        plt.show()
+    return x, t, U
+
+print(*explicit_scheme(Nx[0],Nt[0]),sep='\n\n')
+
+print(*explicit_scheme(Nx[1],Nt[1]),sep='\n\n')
+
+print(*explicit_scheme(Nx[2],Nt[2]),sep='\n\n')
